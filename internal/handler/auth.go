@@ -15,9 +15,14 @@ func (h *Handler) getToken(c *gin.Context) {
 		return
 	}
 
-	//clientIp := c.ClientIP()
+	clientIp := c.ClientIP()
+	if clientIp == "" {
+		newErrorResponse(c, http.StatusBadRequest, "client ip is empty")
+		return
 
-	token, refreshToken, err := h.services.Authorization.GenerateToken(guIdQuery)
+	}
+
+	token, refreshToken, err := h.services.Authorization.GenerateToken(guIdQuery, clientIp)
 	if err != nil {
 		newErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
@@ -38,6 +43,12 @@ func (h *Handler) refresh(c *gin.Context) {
 
 	var input refreshInput
 
+	clientIp := c.ClientIP()
+	if clientIp == "" {
+		newErrorResponse(c, http.StatusBadRequest, "client ip is empty")
+		return
+	}
+
 	if guIdQuery == "" {
 		newErrorResponse(c, http.StatusBadRequest, "guid is empty")
 		return
@@ -56,7 +67,7 @@ func (h *Handler) refresh(c *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, err := h.services.RefreshToken(refreshTokenBase, guIdQuery)
+	accessToken, refreshToken, err := h.services.RefreshToken(refreshTokenBase, guIdQuery, clientIp)
 	if err != nil {
 		newErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return

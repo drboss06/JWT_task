@@ -1,17 +1,27 @@
-version: '3.8'
-
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    ports:
-      - '27017:27017'
+  db:
+    image: postgres:latest
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: example
-    volumes:
-      - mongo-data:/data/db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: qwerty
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-volumes:
-  mongo-data:
-    driver: local
+  migrate:
+    image: migrate/migrate
+    command: ["-path", "/migrations", "-database",  "postgres://postgres:qwerty@db:5432/postgres?sslmode=disable", "up", "1"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    links:
+      - db
+networks:
+  new:

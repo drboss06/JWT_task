@@ -2,64 +2,62 @@ package repository
 
 import (
 	JWTServiceObjects "JWTService"
-	"context"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"fmt"
+	"github.com/jmoiron/sqlx"
 )
 
 type AuthPostgres struct {
-	db *mongo.Client
+	db *sqlx.DB
 }
 
-func NewAuthPostgres(db *mongo.Client) *AuthPostgres {
+func NewAuthPostgres(db *sqlx.DB) *AuthPostgres {
 	return &AuthPostgres{db: db}
 }
 
 func (r *AuthPostgres) SetSession(guid string, session JWTServiceObjects.Session) error {
-	collection := r.db.Database("test").Collection("users")
-	filter := bson.M{"guid": guid}
-	update := bson.M{"$set": bson.M{"guid": guid, "refresh_token": session.RefreshToken, "live_time": session.LiveTime}}
+	query := `
+		INSERT INTO sessions (guid, refresh_token, live_time, client_ip)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (guid)
+		DO UPDATE SET
+			refresh_token = EXCLUDED.refresh_token,
+			live_time = EXCLUDED.live_time,
+			client_ip = EXCLUDED.client_ip;
+	`
 
-	opt := options.Update().SetUpsert(true)
-
-	_, err := collection.UpdateOne(context.TODO(), filter, update, opt)
-
+	_, err := r.db.Exec(query, guid, session.RefreshToken, session.LiveTime, session.ClientIp)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set session: %w", err)
 	}
+
 	return nil
 }
 
 func (r *AuthPostgres) GetSession(guid string) (JWTServiceObjects.Session, error) {
-	collection := r.db.Database("test").Collection("users")
+	query := `
+		SELECT *
+		FROM sessions
+		WHERE guid = $1
+	`
 
-	filter := bson.M{"guid": guid}
-
-	var resault JWTServiceObjects.Session
-	err := collection.FindOne(context.TODO(), filter).Decode(&resault)
+	var session JWTServiceObjects.Session
+	err := r.db.Get(&session, query, guid)
 	if err != nil {
-		return JWTServiceObjects.Session{}, err
+		return JWTServiceObjects.Session{}, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	return resault, nil
+	return session, nil
 }
 
 func (r *AuthPostgres) SetRefreshToken(refreshToken []byte, session JWTServiceObjects.Session) error {
-	collection := r.db.Database("test").Collection("users")
-
-	filter := bson.M{"refresh_token": refreshToken}
-	update := bson.D{
-		{"$set", bson.D{
-			{"refresh_token", session.RefreshToken},
-			{"live_time", session.LiveTime},
-		}},
-	}
-
-	_, err := collection.UpdateOne(context.TODO(), filter, update)
-
+	query := `
+		UPDATE sessions
+		SET refresh_token = $1, live_time = $2
+		WHERE refresh_token = $3
+	`
+	_, err := r.db.Exec(query, session.RefreshToken, session.LiveTime, refreshToken)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update refresh token: %w", err)
 	}
 
 	return nil

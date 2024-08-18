@@ -6,7 +6,7 @@ import (
 
 type Authorization interface {
 	GenerateToken(guid string, clientIp string) (string, string, error)
-	RefreshToken(refreshToken []byte, guid string) (string, string, error)
+	RefreshToken(refreshToken []byte, guid string, curIP string) (string, string, error)
 }
 
 type TodoItem interface {

@@ -2,7 +2,8 @@ package repository
 
 import (
 	JWTServiceObjects "JWTService"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type Authorization interface {
@@ -15,7 +16,7 @@ type Repository struct {
 	Authorization
 }
 
-func NewRepository(db *mongo.Client) *Repository {
+func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{
 		Authorization: NewAuthPostgres(db),
 	}

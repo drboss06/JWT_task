@@ -13,9 +13,13 @@ import (
 func main() {
 	logrus.SetFormatter(new(logrus.JSONFormatter))
 
-	db, err := db2.NewMongoDB(db2.Config{
-		Host: "localhost",
-		Port: "27017",
+	db, err := db2.Connect(db2.Config{
+		Host:     "localhost",
+		Port:     "5432",
+		Username: "postgres",
+		Password: "qwerty",
+		DBName:   "postgres",
+		SSLMode:  "disable",
 	})
 
 	if err != nil {

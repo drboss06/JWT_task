@@ -22,7 +22,8 @@ const (
 
 type tokenClaims struct {
 	jwt.StandardClaims
-	UserID int `json:"user_id"`
+	UserID int    `json:"user_id"`
+	IP     string `json:"ip"`
 }
 
 type AuthService struct {
@@ -35,10 +36,15 @@ func NewAuthServices(repo repository.Authorization) *AuthService {
 
 func (s *AuthService) GenerateToken(guid string, clientIp string) (string, string, error) {
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{
-		ExpiresAt: time.Now().Add(tokenTTL).Unix(),
-		Subject:   guid,
-	})
+	claims := tokenClaims{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(tokenTTL).Unix(),
+			Subject:   guid,
+		},
+		IP: clientIp,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 
 	stringToken, err := token.SignedString([]byte(signingKey)) // Token
 	if err != nil {
@@ -57,6 +63,7 @@ func (s *AuthService) GenerateToken(guid string, clientIp string) (string, strin
 	s.repo.SetSession(guid, JWTServiceObjects.Session{
 		RefreshToken: hashTokenRefresh,
 		LiveTime:     time.Now().Add(tokenTTL),
+		ClientIp:     clientIp,
 	})
 
 	if err != nil {
@@ -66,36 +73,44 @@ func (s *AuthService) GenerateToken(guid string, clientIp string) (string, strin
 	return stringToken, base64.StdEncoding.EncodeToString(b), nil
 }
 
-func (s *AuthService) RefreshToken(refreshToken []byte, guid string) (string, string, error) {
-	session, err := s.repo.GetSession(guid)
+func sendEmailWarning(userEmail string, oldIP, newIP string) {
+	logrus.Infof("Warning email sent to %s: IP address changed from %s to %s", userEmail, oldIP, newIP)
+}
 
+func (s *AuthService) RefreshToken(refreshToken []byte, guid string, curIP string) (string, string, error) {
+	session, err := s.repo.GetSession(guid)
 	if err != nil {
 		return "", "", err
 	}
 
 	err = bcrypt.CompareHashAndPassword(session.RefreshToken, refreshToken)
-
 	if err != nil {
 		return "", "", err
-
 	}
 
 	if session.LiveTime.Before(time.Now()) {
 		return "", "", errors.New("refresh token expired")
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{
-		ExpiresAt: time.Now().Add(tokenTTL).Unix(),
-		Subject:   session.Guid,
-	})
+	if session.ClientIp != curIP {
+		sendEmailWarning("user@example.com", session.ClientIp, curIP)
+	}
 
-	stringToken, err := token.SignedString([]byte(signingKey)) // Token
+	newClaims := tokenClaims{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(tokenTTL).Unix(),
+			Subject:   session.Guid,
+		},
+		IP: curIP,
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS512, newClaims)
+
+	stringToken, err := newToken.SignedString([]byte(signingKey)) // Token
 	if err != nil {
 		return "", "", err
 	}
 
 	b, hashTokenRefresh, err := generateHash()
-
 	if err != nil {
 		return "", "", err
 	}
@@ -126,4 +141,24 @@ func generateHash() ([]byte, []byte, error) {
 	}
 
 	return b, hashTokenRefresh, nil
+}
+
+func parseToken(token string) (string, error) {
+	parsedToken, err := jwt.ParseWithClaims(token, &tokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("invalid signing method")
+		}
+		return []byte(signingKey), nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := parsedToken.Claims.(*tokenClaims)
+
+	if !ok {
+		return "", errors.New("token claims are not of type *tokenClaims")
+	}
+	fmt.Println(claims)
+	return claims.IP, nil
 }
