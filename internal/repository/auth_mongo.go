@@ -3,6 +3,7 @@ package repository
 import (
 	JWTServiceObjects "JWTService"
 	"fmt"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -14,6 +15,14 @@ func NewAuthPostgres(db *sqlx.DB) *AuthPostgres {
 	return &AuthPostgres{db: db}
 }
 
+// SetSession sets a session in the AuthPostgres repository.
+//
+// Parameters:
+// - guid: the unique identifier for the session.
+// - session: the session object containing the refresh token, live time, and client IP.
+//
+// Returns:
+// - error: an error if the session could not be set.
 func (r *AuthPostgres) SetSession(guid string, session JWTServiceObjects.Session) error {
 	query := `
 		INSERT INTO sessions (guid, refresh_token, live_time, client_ip)
@@ -33,6 +42,14 @@ func (r *AuthPostgres) SetSession(guid string, session JWTServiceObjects.Session
 	return nil
 }
 
+// GetSession retrieves a session from the database based on the provided GUID.
+//
+// Parameters:
+// - guid: a string representing the unique identifier of the session.
+//
+// Returns:
+// - JWTServiceObjects.Session: the retrieved session.
+// - error: an error if the session retrieval fails.
 func (r *AuthPostgres) GetSession(guid string) (JWTServiceObjects.Session, error) {
 	query := `
 		SELECT *
@@ -49,6 +66,14 @@ func (r *AuthPostgres) GetSession(guid string) (JWTServiceObjects.Session, error
 	return session, nil
 }
 
+// SetRefreshToken updates a session's refresh token in the database.
+//
+// Parameters:
+// - refreshToken: a byte slice representing the new refresh token.
+// - session: a JWTServiceObjects.Session object containing the session's details.
+//
+// Returns:
+// - error: an error if the refresh token update fails.
 func (r *AuthPostgres) SetRefreshToken(refreshToken []byte, session JWTServiceObjects.Session) error {
 	query := `
 		UPDATE sessions

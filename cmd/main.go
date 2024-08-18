@@ -8,7 +8,6 @@ import (
 	"JWTService/internal/service"
 	"JWTService/pkg/logger"
 	_ "github.com/lib/pq"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"log"
 	"os"
@@ -24,6 +23,7 @@ func main() {
 	if err != nil {
 		logger.GetLogger().Error("Config init error", err)
 	}
+	logger.GetLogger().Info("Config loaded")
 
 	db, err := db2.Connect(db2.Config{
 		Host:     viper.GetString("db.host"),
@@ -34,9 +34,11 @@ func main() {
 		SSLMode:  viper.GetString("db.sslmode"),
 	})
 
+
 	if err != nil {
-		logrus.Fatalf("failed to initialize db: %s", err.Error())
+		logger.GetLogger().Error("DB init error", err)
 	}
+	logger.GetLogger().Info("DB connected")
 
 	repos := repository.NewRepository(db)
 	services := service.NewService(repos)
@@ -44,8 +46,10 @@ func main() {
 
 	srv := new(testTaskObjects.Server)
 	if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil {
-		logrus.Fatalf("error: %s", err.Error())
+		logger.GetLogger().Error("Server error", err)
 	}
+
+	logger.GetLogger().Info("Server started")
 }
 
 func initConfig() error {
