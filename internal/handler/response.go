@@ -1,8 +1,8 @@
 package handler
 
 import (
+	"JWTService/pkg/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 type errorResponse struct {
@@ -14,6 +14,6 @@ type statusResponse struct {
 }
 
 func newErrorResponse(c *gin.Context, statusCode int, message string) {
-	logrus.Error(message)
+	logger.GetLogger().Error(message)
 	c.AbortWithStatusJSON(statusCode, errorResponse{message})
 }

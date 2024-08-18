@@ -1,0 +1,9 @@
+port: "8080"
+logLevel: "info"
+
+db:
+  username: "postgres"
+  host: "db"
+  port: "5432"
+  dbname: "postgres"
+  sslmode: "disable"

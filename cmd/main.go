@@ -6,20 +6,32 @@ import (
 	"JWTService/internal/handler"
 	repository "JWTService/internal/repository"
 	"JWTService/internal/service"
+	"JWTService/pkg/logger"
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"log"
+	"os"
 )
 
 func main() {
-	logrus.SetFormatter(new(logrus.JSONFormatter))
+	err := logger.InitLogger("app.log", viper.GetString("logLevel"))
+	if err != nil {
+		log.Fatal("Logger init error", err)
+	}
+
+	err = initConfig()
+	if err != nil {
+		logger.GetLogger().Error("Config init error", err)
+	}
 
 	db, err := db2.Connect(db2.Config{
-		Host:     "localhost",
-		Port:     "5432",
-		Username: "postgres",
-		Password: "qwerty",
-		DBName:   "postgres",
-		SSLMode:  "disable",
+		Host:     viper.GetString("db.host"),
+		Port:     viper.GetString("db.port"),
+		Username: viper.GetString("db.username"),
+		Password: os.Getenv("DB_PASSWORD"),
+		DBName:   viper.GetString("db.dbname"),
+		SSLMode:  viper.GetString("db.sslmode"),
 	})
 
 	if err != nil {
@@ -31,7 +43,13 @@ func main() {
 	handlers := handler.NewHandler(services)
 
 	srv := new(testTaskObjects.Server)
-	if err := srv.Run("8080", handlers.InitRoutes()); err != nil {
+	if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil {
 		logrus.Fatalf("error: %s", err.Error())
 	}
+}
+
+func initConfig() error {
+	viper.AddConfigPath("configs")
+	viper.SetConfigName("config")
+	return viper.ReadInConfig()
 }
